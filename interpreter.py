@@ -5,10 +5,12 @@
 @file: interpreter.py
 @author: amazing coder
 @date: 2024/8/24
-@desc: simple demo for python interpreter v1.0
+@desc: simple demo for python interpreter v2.0
+v1.0 : only support single-digit integers +
+v2.0 : support multi-digit integers +/-, support process whitespace
 """
 
-INTEGER, PLUS, EOF = 'INTEGER', 'PLUS', 'EOF'
+INTEGER, PLUS, EOF, MINUS = 'INTEGER', 'PLUS', 'EOF', 'MINUS'
 
 class Token(object):
     def __init__(self, type, value):
@@ -30,45 +32,79 @@ class Interpreter(object):
         self.text = text
         self.pos = 0
         self.current_token = None
-
+        self.current_char = self.text[self.pos]
 
     def error(self):
         raise Exception('Error parsing input')
 
-    def get_next_token(self):
-        text = self.text
-
-        if self.pos > len(text) - 1:
-            return Token(EOF, None)
-
-        current_char = text[self.pos]
+    def advance(self):
         self.pos += 1
+        if self.pos > len(self.text) - 1:
+            self.current_char = None
+        else:
+            self.current_char = self.text[self.pos]
 
-        if current_char.isdigit():
-            return Token(INTEGER, int(current_char))
-        if current_char == '+':
-            return Token(PLUS, current_char)
-        self.error()
+    def skip_whitespace(self):
+        while self.current_char is not None and self.current_char == ' ':
+            self.advance()
+
+    def integer(self):
+        """return a multi-digit integer"""
+        result = ''
+        while self.current_char is not None and self.current_char.isdigit():
+            result += self.current_char
+            self.advance()
+        return int(result)
+
+    def get_next_token(self):
+        """Lexical analyzer / scanner / tokenizer, this function breaking a sentence apart into tokens."""
+        while self.current_char is not None:
+            if self.current_char.isspace():
+                self.skip_whitespace()
+                continue
+            if self.current_char.isdigit():
+                return Token(INTEGER, self.integer())
+            if self.current_char == '+':
+                self.advance()
+                return Token(PLUS, '+')
+            if self.current_char == '-':
+                self.advance()
+                return Token(MINUS, '-')
+            self.error()
+        return Token(EOF, None)
 
     def eat(self, token_type):
+        """compare the current token type with the passed token type
+        and if they match then "eat" the current token and assign
+        the next token to the self.current_token, otherwise raise an exception."""
         if self.current_token.type == token_type:
             self.current_token = self.get_next_token()
         else:
             self.error()
 
     def expr(self):
+        """Parser / Parser / Interpreter, this function takes a tokenized stream
+        and produces an abstract syntax tree, or more commonly a "value"."""
         self.current_token = self.get_next_token()
         left = self.current_token
         self.eat(INTEGER)
 
         op = self.current_token
-        self.eat(PLUS)
+        if op.type == PLUS:
+            op_str = '+'
+            self.eat(PLUS)
+        elif op.type == MINUS:
+            op_str = '-'
+            self.eat(MINUS)
+        else:
+            self.error()
 
         right = self.current_token
         self.eat(INTEGER)
 
-        result = left.value + right.value
-        return result
+        result = ' '.join([str(left.value), op_str, str(right.value)])
+
+        return eval(result)
 
 def main():
     while True:
