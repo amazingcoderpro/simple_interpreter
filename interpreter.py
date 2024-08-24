@@ -5,10 +5,12 @@
 @file: interpreter.py
 @author: amazing coder
 @date: 2024/8/24
-@desc: simple demo for python interpreter v1.0
+@desc: simple demo for python interpreter v2.0
+v1.0 : only support single-digit integers +
+v2.0 : support multi-digit integers +/-, support process whitespace
 """
 
-INTEGER, PLUS, EOF = 'INTEGER', 'PLUS', 'EOF'
+INTEGER, PLUS, EOF, MINUS = 'INTEGER', 'PLUS', 'EOF', 'MINUS'
 
 class Token(object):
     def __init__(self, type, value):
@@ -31,7 +33,6 @@ class Interpreter(object):
         self.pos = 0
         self.current_token = None
 
-
     def error(self):
         raise Exception('Error parsing input')
 
@@ -45,9 +46,16 @@ class Interpreter(object):
         self.pos += 1
 
         if current_char.isdigit():
+            while self.pos < len(text) and text[self.pos].isdigit():
+                current_char += text[self.pos]
+                self.pos += 1
             return Token(INTEGER, int(current_char))
         if current_char == '+':
             return Token(PLUS, current_char)
+        if current_char == '-':
+            return Token(MINUS, current_char)
+        if current_char == ' ':
+            return self.get_next_token()
         self.error()
 
     def eat(self, token_type):
@@ -62,13 +70,21 @@ class Interpreter(object):
         self.eat(INTEGER)
 
         op = self.current_token
-        self.eat(PLUS)
+        if op.type == PLUS:
+            op_str = '+'
+            self.eat(PLUS)
+        elif op.type == MINUS:
+            op_str = '-'
+            self.eat(MINUS)
+        else:
+            self.error()
 
         right = self.current_token
         self.eat(INTEGER)
 
-        result = left.value + right.value
-        return result
+        result = ' '.join([str(left.value), op_str, str(right.value)])
+
+        return eval(result)
 
 def main():
     while True:
