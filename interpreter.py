@@ -32,39 +32,59 @@ class Interpreter(object):
         self.text = text
         self.pos = 0
         self.current_token = None
+        self.current_char = self.text[self.pos]
 
     def error(self):
         raise Exception('Error parsing input')
 
-    def get_next_token(self):
-        text = self.text
-
-        if self.pos > len(text) - 1:
-            return Token(EOF, None)
-
-        current_char = text[self.pos]
+    def advance(self):
         self.pos += 1
+        if self.pos > len(self.text) - 1:
+            self.current_char = None
+        else:
+            self.current_char = self.text[self.pos]
 
-        if current_char.isdigit():
-            while self.pos < len(text) and text[self.pos].isdigit():
-                current_char += text[self.pos]
-                self.pos += 1
-            return Token(INTEGER, int(current_char))
-        if current_char == '+':
-            return Token(PLUS, current_char)
-        if current_char == '-':
-            return Token(MINUS, current_char)
-        if current_char == ' ':
-            return self.get_next_token()
-        self.error()
+    def skip_whitespace(self):
+        while self.current_char is not None and self.current_char == ' ':
+            self.advance()
+
+    def integer(self):
+        """return a multi-digit integer"""
+        result = ''
+        while self.current_char is not None and self.current_char.isdigit():
+            result += self.current_char
+            self.advance()
+        return int(result)
+
+    def get_next_token(self):
+        """Lexical analyzer / scanner / tokenizer, this function breaking a sentence apart into tokens."""
+        while self.current_char is not None:
+            if self.current_char.isspace():
+                self.skip_whitespace()
+                continue
+            if self.current_char.isdigit():
+                return Token(INTEGER, self.integer())
+            if self.current_char == '+':
+                self.advance()
+                return Token(PLUS, '+')
+            if self.current_char == '-':
+                self.advance()
+                return Token(MINUS, '-')
+            self.error()
+        return Token(EOF, None)
 
     def eat(self, token_type):
+        """compare the current token type with the passed token type
+        and if they match then "eat" the current token and assign
+        the next token to the self.current_token, otherwise raise an exception."""
         if self.current_token.type == token_type:
             self.current_token = self.get_next_token()
         else:
             self.error()
 
     def expr(self):
+        """Parser / Parser / Interpreter, this function takes a tokenized stream
+        and produces an abstract syntax tree, or more commonly a "value"."""
         self.current_token = self.get_next_token()
         left = self.current_token
         self.eat(INTEGER)
