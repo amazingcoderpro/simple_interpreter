@@ -7,7 +7,6 @@
 @date: 2024/8/24
 @desc: simple demo for python interpreter v1.0
 """
-from unittest.mock import right
 
 INTEGER, PLUS, EOF = 'INTEGER', 'PLUS', 'EOF'
 
