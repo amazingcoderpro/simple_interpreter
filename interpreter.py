@@ -8,6 +8,7 @@
 @desc: simple demo for python interpreter v2.0
 v1.0 : only support single-digit integers +
 v2.0 : support multi-digit integers +/-, support process whitespace
+v3.0 : support parse (recognize) and interpret arithmetic expressions that have any number of plus or minus operators in it, for example “7 - 3 + 2 - 1”.
 """
 
 INTEGER, PLUS, EOF, MINUS = 'INTEGER', 'PLUS', 'EOF', 'MINUS'
@@ -82,29 +83,27 @@ class Interpreter(object):
         else:
             self.error()
 
+    def term(self):
+        if self.current_token.type != INTEGER:
+            self.error()
+        term = self.current_token
+        self.eat(INTEGER)
+        return term.value
+
     def expr(self):
         """Parser / Parser / Interpreter, this function takes a tokenized stream
         and produces an abstract syntax tree, or more commonly a "value"."""
         self.current_token = self.get_next_token()
-        left = self.current_token
-        self.eat(INTEGER)
-
-        op = self.current_token
-        if op.type == PLUS:
-            op_str = '+'
-            self.eat(PLUS)
-        elif op.type == MINUS:
-            op_str = '-'
-            self.eat(MINUS)
-        else:
-            self.error()
-
-        right = self.current_token
-        self.eat(INTEGER)
-
-        result = ' '.join([str(left.value), op_str, str(right.value)])
-
-        return eval(result)
+        result = self.term()
+        while True:
+            op = self.current_token
+            if op.type == PLUS:
+                result += self.term()
+            elif op.type == MINUS:
+                result -= self.term()
+            else:
+                break
+        return result
 
 def main():
     while True:
