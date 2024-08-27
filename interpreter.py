@@ -10,6 +10,7 @@ v1.0 : only support single-digit integers +
 v2.0 : support multi-digit integers +/-, support process whitespace
 v3.0 : support to parse (recognize) and interpret arithmetic expressions that have any number of plus or minus operators in it, for example “7 - 3 + 2 - 1”.
 v4.0 : support to parse and interpret arithmetic expressions with any number of multiplication and division operators in them, for example “7 * 4 / 2 * 3”
+v5.0 : support to handle valid arithmetic expressions containing integers and any number of addition, subtraction, multiplication, and division operators.
 """
 
 INTEGER, PLUS, EOF, MINUS, MUL, DIV = 'INTEGER', 'PLUS', 'EOF', 'MINUS', 'MUL', 'DIV'
@@ -28,18 +29,18 @@ class Token(object):
     def __repr__(self):
          return self.__str__()
 
-class Interpreter(object):
-
+class Analyzer(object):
+    """Lexical analyzer 表达式的语法解析器，用于将表达式解析成token流"""
     def __init__(self, text):
         self.text = text
         self.pos = 0
-        self.current_token = None
         self.current_char = self.text[self.pos]
 
     def error(self):
-        raise Exception('Error parsing input')
+        return Exception("Invalid input")
 
     def advance(self):
+        """Advance the 'pos' pointer and set the 'current_char' variable."""
         self.pos += 1
         if self.pos > len(self.text) - 1:
             self.current_char = None
@@ -47,6 +48,7 @@ class Interpreter(object):
             self.current_char = self.text[self.pos]
 
     def skip_whitespace(self):
+        """Skip whitespace, tab, newline."""
         while self.current_char is not None and self.current_char == ' ':
             self.advance()
 
@@ -59,7 +61,7 @@ class Interpreter(object):
         return int(result)
 
     def get_next_token(self):
-        """Lexical analyzer / scanner / tokenizer, this function breaking a sentence apart into tokens."""
+        """this function breaking a sentence apart into tokens."""
         while self.current_char is not None:
             if self.current_char.isspace():
                 self.skip_whitespace()
@@ -82,24 +84,38 @@ class Interpreter(object):
             self.error()
         return Token(EOF, None)
 
+
+class Interpreter(object):
+    def __init__(self, analyzer):
+        self.analyzer = analyzer
+        self.current_token = self.analyzer.get_next_token()
+
+    def error(self):
+        raise Exception('Invalid Syntax')
+
     def eat(self, token_type):
         """compare the current token type with the passed token type
         and if they match then "eat" the current token and assign
         the next token to the self.current_token, otherwise raise an exception."""
         if self.current_token.type == token_type:
-            self.current_token = self.get_next_token()
+            self.current_token = self.analyzer.get_next_token()
         else:
             self.error()
 
     def term(self):
-        # 目前只支持整型类型的表达式
-        if self.current_token.type != INTEGER:
-            self.error()
-        term = self.current_token
-        self.eat(INTEGER)
-        return term.value
+        """计算乘除表达块： factor((MUL|DIV) factor)* """
+        result = self.factor()
+        while self.current_token.type in (MUL, DIV):
+            if self.current_token.type == MUL:
+                self.eat(MUL)
+                result *= self.factor()
+            elif self.current_token.type == DIV:
+                self.eat(DIV)
+                result /= self.factor()
+        return result
 
     def factor(self):
+        """返回乘除表达式的数，目前只支持整型"""
         if self.current_token.type != INTEGER:
             self.error()
         factor = self.current_token
@@ -107,40 +123,32 @@ class Interpreter(object):
         return factor.value
 
     def expr(self):
-        """Parser / Parser / Interpreter, this function takes a tokenized stream
-        and produces an abstract syntax tree, or more commonly a "value"."""
-        self.current_token = self.get_next_token()
+        """计算加减表达块：term((PLUS|MINUS) term)* ."""
         result = self.term()
         while self.current_token.type in (PLUS, MINUS, MUL, DIV):
-            # 目前只能支持纯加减，或者纯乘除的表达式，加减乘除的复合运算涉及优先级问题暂不支持
-            op = self.current_token
-            if op.type == PLUS:
+            if self.current_token.type == PLUS:
                 self.eat(PLUS)
                 result += self.term()
-            elif op.type == MINUS:
+            elif self.current_token.type == MINUS:
                 self.eat(MINUS)
                 result -= self.term()
-            elif op.type == MUL:
-                self.eat(MUL)
-                result *= self.factor()
-            elif op.type == DIV:
-                self.eat(DIV)
-                result /= self.factor()
         return result
+
 
 def main():
     while True:
         try:
-            text = input('input a express like "1+2"(Only single digit integers are allowed in the input)> ')
+            text = input('input a express like "1+2*3+16/4"(Only single digit integers are allowed in the input)> ')
         except EOFError:
             break
 
         if not text:
             continue
-
-        interpreter = Interpreter(text)
+        analyzer = Analyzer(text)
+        interpreter = Interpreter(analyzer)
         result = interpreter.expr()
         print(result)
+
 
 if __name__ == '__main__':
     main()
