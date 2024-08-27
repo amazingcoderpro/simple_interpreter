@@ -11,9 +11,10 @@ v2.0 : support multi-digit integers +/-, support process whitespace
 v3.0 : support to parse (recognize) and interpret arithmetic expressions that have any number of plus or minus operators in it, for example “7 - 3 + 2 - 1”.
 v4.0 : support to parse and interpret arithmetic expressions with any number of multiplication and division operators in them, for example “7 * 4 / 2 * 3”
 v5.0 : support to handle valid arithmetic expressions containing integers and any number of addition, subtraction, multiplication, and division operators.
+v6.0 : support to evaluates arithmetic expressions that have different operators and parentheses.
 """
 
-INTEGER, PLUS, EOF, MINUS, MUL, DIV = 'INTEGER', 'PLUS', 'EOF', 'MINUS', 'MUL', 'DIV'
+INTEGER, PLUS, EOF, MINUS, MUL, DIV, LPAREN, RPAREN = 'INTEGER', 'PLUS', 'EOF', 'MINUS', 'MUL', 'DIV', 'LPAREN', 'RPAREN'
 
 class Token(object):
     def __init__(self, type, value):
@@ -80,6 +81,12 @@ class Analyzer(object):
             if self.current_char == '/':
                 self.advance()
                 return Token(DIV, '/')
+            if self.current_char == '(':
+                self.advance()
+                return Token(LPAREN, '(')
+            if self.current_char == ')':
+                self.advance()
+                return Token(RPAREN, ')')
 
             self.error()
         return Token(EOF, None)
@@ -115,15 +122,25 @@ class Interpreter(object):
         return result
 
     def factor(self):
-        """返回乘除表达式的数，目前只支持整型"""
-        if self.current_token.type != INTEGER:
+        """返回参与运算的数，支持整型或者带括号的表达式"""
+        token = self.current_token
+        if self.current_token.type == INTEGER:
+            self.eat(INTEGER)
+            return token.value
+        elif self.current_token.type == LPAREN:
+            self.eat(LPAREN)
+            result = self.expr()
+            self.eat(RPAREN)
+            return result
+        else:
             self.error()
-        factor = self.current_token
-        self.eat(INTEGER)
-        return factor.value
 
     def expr(self):
-        """计算加减表达块：term((PLUS|MINUS) term)* ."""
+        """表达式解析：term((PLUS|MINUS) term)* .
+        expr   : term ((PLUS | MINUS) term)*
+        term   : factor ((MUL | DIV) factor)*
+        factor : INTEGER | LPAREN expr RPAREN
+        """
         result = self.term()
         while self.current_token.type in (PLUS, MINUS, MUL, DIV):
             if self.current_token.type == PLUS:
@@ -138,7 +155,7 @@ class Interpreter(object):
 def main():
     while True:
         try:
-            text = input('input a express like "1+2*3+16/4"(Only single digit integers are allowed in the input)> ')
+            text = input('input a express like "10+2*3+16/(4+4)-(3-2)*2"(Only single digit integers are allowed in the input)> ')
         except EOFError:
             break
 
