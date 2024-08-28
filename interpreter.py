@@ -12,7 +12,10 @@ v3.0 : support to parse (recognize) and interpret arithmetic expressions that ha
 v4.0 : support to parse and interpret arithmetic expressions with any number of multiplication and division operators in them, for example “7 * 4 / 2 * 3”
 v5.0 : support to handle valid arithmetic expressions containing integers and any number of addition, subtraction, multiplication, and division operators.
 v6.0 : support to evaluates arithmetic expressions that have different operators and parentheses.
+v7.0 : using ASTs represent the operator-operand model of arithmetic expressions.
 """
+
+from ast import BinOp, Num
 
 INTEGER, PLUS, EOF, MINUS, MUL, DIV, LPAREN, RPAREN = 'INTEGER', 'PLUS', 'EOF', 'MINUS', 'MUL', 'DIV', 'LPAREN', 'RPAREN'
 
@@ -92,7 +95,7 @@ class Analyzer(object):
         return Token(EOF, None)
 
 
-class Interpreter(object):
+class Parser(object):
     def __init__(self, analyzer):
         self.analyzer = analyzer
         self.current_token = self.analyzer.get_next_token()
@@ -111,27 +114,27 @@ class Interpreter(object):
 
     def term(self):
         """计算乘除表达块： factor((MUL|DIV) factor)* """
-        result = self.factor()
+        node = self.factor()
         while self.current_token.type in (MUL, DIV):
+            token = self.current_token
             if self.current_token.type == MUL:
                 self.eat(MUL)
-                result *= self.factor()
             elif self.current_token.type == DIV:
                 self.eat(DIV)
-                result /= self.factor()
-        return result
+            node = BinOp(left=node, op=token, right=self.factor())
+        return node
 
     def factor(self):
-        """返回参与运算的数，支持整型或者带括号的表达式"""
+        """返回参与运算的数，支持整型或者带括号的表达式 INTEGER | LPAREN expr RPAREN"""
         token = self.current_token
         if self.current_token.type == INTEGER:
             self.eat(INTEGER)
-            return token.value
+            return Num(token)
         elif self.current_token.type == LPAREN:
             self.eat(LPAREN)
-            result = self.expr()
+            node = self.expr()
             self.eat(RPAREN)
-            return result
+            return node
         else:
             self.error()
 
@@ -141,16 +144,54 @@ class Interpreter(object):
         term   : factor ((MUL | DIV) factor)*
         factor : INTEGER | LPAREN expr RPAREN
         """
-        result = self.term()
-        while self.current_token.type in (PLUS, MINUS, MUL, DIV):
+        node = self.term()
+        while self.current_token.type in (PLUS, MINUS):
+            token = self.current_token
             if self.current_token.type == PLUS:
                 self.eat(PLUS)
-                result += self.term()
             elif self.current_token.type == MINUS:
                 self.eat(MINUS)
-                result -= self.term()
-        return result
+            node = BinOp(left=node, op=token, right=self.term())
+        return node
 
+    def parse(self):
+        return self.expr()
+
+class NodeVisitor(object):
+    def visit(self, node):
+        method_name = 'visit_' + type(node).__name__
+        visitor = getattr(self, method_name, self.generic_visit)
+        return visitor(node)
+
+    def generic_visit(self, node):
+        raise Exception('No visit_{} method'.format(type(node).__name__))
+
+class Interpreter(NodeVisitor):
+    def __init__(self, parser):
+        self.parser = parser
+
+    def visit_BinOp(self, node):
+        if node.op.type == PLUS:
+            return self.visit(node.left) + self.visit(node.right)
+        elif node.op.type == MINUS:
+            return self.visit(node.left) - self.visit(node.right)
+        elif node.op.type == MUL:
+            return self.visit(node.left) * self.visit(node.right)
+        elif node.op.type == DIV:
+            return self.visit(node.left) / self.visit(node.right)
+
+    def visit_Num(self, node):
+        return node.token.value
+
+    def visit(self, node):
+        if isinstance(node, BinOp):
+            return self.visit_BinOp(node)
+        elif isinstance(node, Num):
+            return self.visit_Num(node)
+
+    def interpret(self):
+        tree = self.parser.parse()
+        return self.visit(tree)
 
 def main():
     while True:
@@ -162,9 +203,9 @@ def main():
         if not text:
             continue
         analyzer = Analyzer(text)
-        interpreter = Interpreter(analyzer)
-        result = interpreter.expr()
-        print(result)
+        parser = Parser(analyzer)
+        interpreter = Interpreter(parser)
+        print(interpreter.interpret())
 
 
 if __name__ == '__main__':
