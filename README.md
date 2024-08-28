@@ -1,7 +1,5 @@
-# simple_interpreter
-simple demo for python interpreter 
-
-一个用 python 实现的简单解释器，支持解释 python 代码
+# simple_interpreter (A python interpreter implemented in python.)
+一个用 python 实现的简单python解释器
 
 分版本逐步实现完整功能，适合初学者学习解释器的工作原理
 
