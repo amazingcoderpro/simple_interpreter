@@ -14,25 +14,16 @@ v5.0 : support to handle valid arithmetic expressions containing integers and an
 v6.0 : support to evaluates arithmetic expressions that have different operators and parentheses.
 v7.0 : using ASTs represent the operator-operand model of arithmetic expressions.
 v8.0 : support unary operators (+, -)
+v9.0 : support to handle python assignment statements.
 """
 
-from ast import BinOp, Num, UnaryOp
+import keyword
+from abs_syntax_tree import BinOp, Num, UnaryOp, Var, NoOp, Compound, Assign
+from sip_token import Token
 
-INTEGER, PLUS, EOF, MINUS, MUL, DIV, LPAREN, RPAREN = 'INTEGER', 'PLUS', 'EOF', 'MINUS', 'MUL', 'DIV', 'LPAREN', 'RPAREN'
 
-class Token(object):
-    def __init__(self, type, value):
-        self.type = type
-        self.value = value
-
-    def __str__(self):
-        return 'Token({type}, {value})'.format(
-            type=self.type,
-            value=repr(self.value)
-        )
-
-    def __repr__(self):
-         return self.__str__()
+INTEGER, PLUS, EOF, MINUS, MUL, DIV, LPAREN, RPAREN, ID, ASSIGN, REPL = 'INTEGER', 'PLUS', 'EOF', 'MINUS', 'MUL', 'DIV', 'LPAREN', 'RPAREN', 'ID', 'ASSIGN', 'REPL'
+PYTHON_RESERVED_KEYWORDS = {key: Token(key, key) for key in keyword.kwlist}
 
 class Analyzer(object):
     """Lexical analyzer 表达式的语法解析器，用于将表达式解析成token流"""
@@ -42,7 +33,7 @@ class Analyzer(object):
         self.current_char = self.text[self.pos]
 
     def error(self):
-        return Exception("Invalid input")
+        return SyntaxError("invalid syntax")
 
     def advance(self):
         """Advance the 'pos' pointer and set the 'current_char' variable."""
@@ -54,8 +45,15 @@ class Analyzer(object):
 
     def skip_whitespace(self):
         """Skip whitespace, tab, newline."""
-        while self.current_char is not None and self.current_char == ' ':
+        while self.current_char is not None and self.current_char.isspace():
             self.advance()
+
+    def peek(self):
+        peek_pos = self.pos + 1
+        if peek_pos > len(self.text) - 1:
+            return None
+        else:
+            return self.text[peek_pos]
 
     def integer(self):
         """return a multi-digit integer"""
@@ -64,6 +62,17 @@ class Analyzer(object):
             result += self.current_char
             self.advance()
         return int(result)
+
+    def identifier(self):
+        """return a multi-digit identifier"""
+        result = ''
+        while self.current_char is not None and self.current_char.isalnum():
+            result += self.current_char
+            self.advance()
+
+        if result in PYTHON_RESERVED_KEYWORDS:
+            return self.error()
+        return Token(ID, result)
 
     def get_next_token(self):
         """this function breaking a sentence apart into tokens."""
@@ -91,6 +100,15 @@ class Analyzer(object):
             if self.current_char == ')':
                 self.advance()
                 return Token(RPAREN, ')')
+            if self.current_char.isalpha():
+                return self.identifier()
+            if self.current_char == '=':
+                self.advance()
+                return Token(ASSIGN, '=')
+            if self.current_char == '\\' and self.peek() == 'n':
+                self.advance()
+                self.advance()
+                return Token(REPL, '\\n')
 
             self.error()
         return Token(EOF, None)
@@ -125,25 +143,62 @@ class Parser(object):
             node = BinOp(left=node, op=token, right=self.factor())
         return node
 
-    def factor(self):
-        """返回参与运算的数，支持整型或者带括号的表达式 INTEGER | LPAREN expr RPAREN | (PLUS|MINUS) factor"""
+    def variable(self):
+        node = Var(self.current_token)
+        self.eat(ID)
+        return node
+
+    def empty(self):
+        return NoOp()
+
+    def assignment_statement(self):
+        """
+        assignment_statement : variable ASSIGN expr
+        """
+        left = self.variable()
         token = self.current_token
-        if self.current_token.type == PLUS:
-            self.eat(PLUS)
-            return UnaryOp(op=token, expr=self.factor())
-        elif self.current_token.type == MINUS:
-            self.eat(MINUS)
-            return UnaryOp(op=token, expr=self.factor())
-        elif self.current_token.type == INTEGER:
-            self.eat(INTEGER)
-            return Num(token)
-        elif self.current_token.type == LPAREN:
-            self.eat(LPAREN)
-            node = self.expr()
-            self.eat(RPAREN)
-            return node
+        self.eat(ASSIGN)
+        right = self.expr()
+        node = Assign(left=left, op=token, right=right)
+        return node
+
+    def statement(self):
+        """statement : assignment_statement | empty"""
+        if self.current_token.type == ID:
+            node = self.assignment_statement()
         else:
-            self.error()
+            node = self.empty()
+        return node
+
+    def statements(self):
+        """
+        statements : statement
+                   | statement REPL statement_list
+        """
+        node = self.statement()
+        results = [node]
+        while self.current_token.type == ID:
+            results.append(self.statement())
+
+        return results
+
+    def compound_statement(self):
+        """
+        compound_statement : statement_list
+        """
+        # self.eat(REPL)
+        nodes = self.statements()
+        # self.eat(REPL)
+
+        root = Compound()
+        for node in nodes:
+            root.children.append(node)
+        return root
+
+    def program(self):
+        """program : compound_statement """
+        node = self.compound_statement()
+        return node
 
     def expr(self):
         """表达式解析：term((PLUS|MINUS) term)* .
@@ -161,8 +216,34 @@ class Parser(object):
             node = BinOp(left=node, op=token, right=self.term())
         return node
 
+    def factor(self):
+        """返回参与运算的数，支持整型或者带括号的表达式 INTEGER | LPAREN expr RPAREN | (PLUS|MINUS) factor | variable"""
+        token = self.current_token
+        if self.current_token.type == PLUS:
+            self.eat(PLUS)
+            return UnaryOp(op=token, expr=self.factor())
+        elif self.current_token.type == MINUS:
+            self.eat(MINUS)
+            return UnaryOp(op=token, expr=self.factor())
+        elif self.current_token.type == INTEGER:
+            self.eat(INTEGER)
+            return Num(token)
+        elif self.current_token.type == LPAREN:
+            self.eat(LPAREN)
+            node = self.expr()
+            self.eat(RPAREN)
+            return node
+        elif self.current_token.type == ID:
+            node = self.variable()
+            return node
+        else:
+            self.error()
+
     def parse(self):
-        return self.expr()
+        node = self.program()
+        if self.current_token.type != EOF:
+            self.error()
+        return node
 
 
 class NodeVisitor(object):
@@ -178,6 +259,7 @@ class NodeVisitor(object):
 class Interpreter(NodeVisitor):
     def __init__(self, parser):
         self.parser = parser
+        self.GLOBAL_SCOPE = {}
 
     def visit_BinOp(self, node):
         if node.op.type == PLUS:
@@ -198,6 +280,25 @@ class Interpreter(NodeVisitor):
         elif node.op.type == MINUS:
             return -self.visit(node.expr)
 
+    def visit_Assign(self, node):
+        var_name = node.left.value
+        self.GLOBAL_SCOPE[var_name] = self.visit(node.right)
+
+    def visit_NoOp(self, node):
+        pass
+
+    def visit_Compound(self, node):
+        for child in node.children:
+            self.visit(child)
+
+    def visit_Var(self, node):
+        var_name = node.value
+        val = self.GLOBAL_SCOPE.get(var_name)
+        if val is None:
+            raise NameError(repr(var_name))
+        else:
+            return val
+
     def visit(self, node):
         if isinstance(node, BinOp):
             return self.visit_BinOp(node)
@@ -205,41 +306,30 @@ class Interpreter(NodeVisitor):
             return self.visit_Num(node)
         elif isinstance(node, UnaryOp):
             return self.visit_UnaryOp(node)
+        elif isinstance(node, Var):
+            return self.visit_Var(node)
+        elif isinstance(node, Assign):
+            return self.visit_Assign(node)
+        elif isinstance(node, Compound):
+            return self.visit_Compound(node)
+        elif isinstance(node, NoOp):
+            return self.visit_NoOp(node)
 
     def interpret(self):
         tree = self.parser.parse()
         return self.visit(tree)
 
 
-def test_unary_op():
-    """
-    测试一元运算符, text=6---1
-    """
-    text = '5---2'
-    six_tok = Num(Token(INTEGER, 5))
-    one_tok =  Num(Token(INTEGER, 2))
-    minus_tok = Token(MINUS, '-')
-    exp_node = BinOp(six_tok, minus_tok, UnaryOp(minus_tok, UnaryOp(minus_tok, one_tok)))
-    interpreter = Interpreter(None)
-    print(interpreter.visit(exp_node))
-
-
 def main():
-    test_unary_op()
-    while True:
-        try:
-            text = input('input a express like "10+2*3+16/(4+4)-(3-2)*2"(Only single digit integers are allowed in the input)> ')
-        except EOFError:
-            break
-
-        if not text:
-            continue
-        analyzer = Analyzer(text)
-        parser = Parser(analyzer)
-        interpreter = Interpreter(parser)
-        print(interpreter.interpret())
+    import sys
+    text = open(sys.argv[1], 'r').read()
+    print(f"begin parse input: {text}")
+    lexer = Analyzer(text)
+    parser = Parser(lexer)
+    interpreter = Interpreter(parser)
+    result = interpreter.interpret()
+    print(interpreter.GLOBAL_SCOPE)
 
 
 if __name__ == '__main__':
     main()
-
