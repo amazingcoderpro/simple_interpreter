@@ -1,9 +1,8 @@
 # simple_interpreter (A python interpreter implemented in python.)
-一个用 python 实现的简单python解释器
-
-分版本逐步实现完整功能，适合初学者学习解释器的工作原理
+一个用 python 实现的简单python解释器，分版本（与分支对应）逐步实现一个简单的python解释器功能，适合初学者了解解释器的工作原理
 
 ## 版本说明
+为了方便渐进式学习进度，每一个版本都创建了一个独立的分支，比如 v1.0版本对应的分支名为 v1.0, 该分支只实现了 v1.0 的功能，以此类推，逐步进行功能迭代。
 ### v1.0 
 only support single-digit integers +
 
