@@ -45,3 +45,15 @@ support unary operators (+, -)
  python genastdot.py "5---2" > ast.dot && dot -Tpng -o ast_v8.png ast.dot    
 ```
 ![ast_v8.png](ast_v8.png)
+
+
+### v9.0 
+support to handle python assignment statements.
+
+```shell
+python interpreter.py assignments.txt
+```
+
+```shell
+python genastdot.py assignments.txt > ast.dot && dot -Tpng -o ast_v9.png ast.dot  
+```

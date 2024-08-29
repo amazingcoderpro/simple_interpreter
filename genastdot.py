@@ -1,13 +1,3 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
-
-"""
-@file: genastdot.py
-@author: amazing coder
-@date: 2024/8/28
-@desc: 
-"""
-
 ###############################################################################
 #  AST visualizer - generates a DOT file for Graphviz.                        #
 #                                                                             #
@@ -63,6 +53,43 @@ class ASTVisualizer(NodeVisitor):
         s = '  node{} -> node{}\n'.format(node._num, node.expr._num)
         self.dot_body.append(s)
 
+    def visit_Compound(self, node):
+        s = '  node{} [label="Compound"]\n'.format(self.ncount)
+        self.dot_body.append(s)
+        node._num = self.ncount
+        self.ncount += 1
+
+        for child in node.children:
+            self.visit(child)
+            s = '  node{} -> node{}\n'.format(node._num, child._num)
+            self.dot_body.append(s)
+
+    def visit_Assign(self, node):
+        s = '  node{} [label="{}"]\n'.format(self.ncount, node.op.value)
+        self.dot_body.append(s)
+        node._num = self.ncount
+        self.ncount += 1
+
+        self.visit(node.left)
+        self.visit(node.right)
+
+        for child_node in (node.left, node.right):
+            s = '  node{} -> node{}\n'.format(node._num, child_node._num)
+            self.dot_body.append(s)
+
+    def visit_Var(self, node):
+        s = '  node{} [label="{}"]\n'.format(self.ncount, node.value)
+        self.dot_body.append(s)
+        node._num = self.ncount
+        self.ncount += 1
+
+    def visit_NoOp(self, node):
+        s = '  node{} [label="NoOp"]\n'.format(self.ncount)
+        self.dot_body.append(s)
+        node._num = self.ncount
+        self.ncount += 1
+
+
     def gendot(self):
         tree = self.parser.parse()
         self.visit(tree)
@@ -74,11 +101,12 @@ def main():
         description='Generate an AST DOT file.'
     )
     argparser.add_argument(
-        'text',
-        help='Arithmetic expression (in quotes): "1 + 2 * 3"'
+        'fname',
+        help='Pascal source file'
     )
     args = argparser.parse_args()
-    text = args.text
+    fname = args.fname
+    text = open(fname, 'r').read()
 
     lexer = Analyzer(text)
     parser = Parser(lexer)
