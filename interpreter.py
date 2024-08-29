@@ -13,9 +13,10 @@ v4.0 : support to parse and interpret arithmetic expressions with any number of 
 v5.0 : support to handle valid arithmetic expressions containing integers and any number of addition, subtraction, multiplication, and division operators.
 v6.0 : support to evaluates arithmetic expressions that have different operators and parentheses.
 v7.0 : using ASTs represent the operator-operand model of arithmetic expressions.
+v8.0 : support unary operators (+, -)
 """
 
-from ast import BinOp, Num
+from ast import BinOp, Num, UnaryOp
 
 INTEGER, PLUS, EOF, MINUS, MUL, DIV, LPAREN, RPAREN = 'INTEGER', 'PLUS', 'EOF', 'MINUS', 'MUL', 'DIV', 'LPAREN', 'RPAREN'
 
@@ -125,9 +126,15 @@ class Parser(object):
         return node
 
     def factor(self):
-        """返回参与运算的数，支持整型或者带括号的表达式 INTEGER | LPAREN expr RPAREN"""
+        """返回参与运算的数，支持整型或者带括号的表达式 INTEGER | LPAREN expr RPAREN | (PLUS|MINUS) factor"""
         token = self.current_token
-        if self.current_token.type == INTEGER:
+        if self.current_token.type == PLUS:
+            self.eat(PLUS)
+            return UnaryOp(op=token, expr=self.factor())
+        elif self.current_token.type == MINUS:
+            self.eat(MINUS)
+            return UnaryOp(op=token, expr=self.factor())
+        elif self.current_token.type == INTEGER:
             self.eat(INTEGER)
             return Num(token)
         elif self.current_token.type == LPAREN:
@@ -142,7 +149,7 @@ class Parser(object):
         """表达式解析：term((PLUS|MINUS) term)* .
         expr   : term ((PLUS | MINUS) term)*
         term   : factor ((MUL | DIV) factor)*
-        factor : INTEGER | LPAREN expr RPAREN
+        factor : INTEGER | LPAREN expr RPAREN | (PLUS|MINUS) factor
         """
         node = self.term()
         while self.current_token.type in (PLUS, MINUS):
@@ -157,6 +164,7 @@ class Parser(object):
     def parse(self):
         return self.expr()
 
+
 class NodeVisitor(object):
     def visit(self, node):
         method_name = 'visit_' + type(node).__name__
@@ -165,6 +173,7 @@ class NodeVisitor(object):
 
     def generic_visit(self, node):
         raise Exception('No visit_{} method'.format(type(node).__name__))
+
 
 class Interpreter(NodeVisitor):
     def __init__(self, parser):
@@ -183,17 +192,40 @@ class Interpreter(NodeVisitor):
     def visit_Num(self, node):
         return node.token.value
 
+    def visit_UnaryOp(self, node):
+        if node.op.type == PLUS:
+            return self.visit(node.expr)
+        elif node.op.type == MINUS:
+            return -self.visit(node.expr)
+
     def visit(self, node):
         if isinstance(node, BinOp):
             return self.visit_BinOp(node)
         elif isinstance(node, Num):
             return self.visit_Num(node)
+        elif isinstance(node, UnaryOp):
+            return self.visit_UnaryOp(node)
 
     def interpret(self):
         tree = self.parser.parse()
         return self.visit(tree)
 
+
+def test_unary_op():
+    """
+    测试一元运算符, text=6---1
+    """
+    text = '5---2'
+    six_tok = Num(Token(INTEGER, 5))
+    one_tok =  Num(Token(INTEGER, 2))
+    minus_tok = Token(MINUS, '-')
+    exp_node = BinOp(six_tok, minus_tok, UnaryOp(minus_tok, UnaryOp(minus_tok, one_tok)))
+    interpreter = Interpreter(None)
+    print(interpreter.visit(exp_node))
+
+
 def main():
+    test_unary_op()
     while True:
         try:
             text = input('input a express like "10+2*3+16/(4+4)-(3-2)*2"(Only single digit integers are allowed in the input)> ')

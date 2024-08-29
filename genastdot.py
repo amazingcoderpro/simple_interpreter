@@ -53,6 +53,16 @@ class ASTVisualizer(NodeVisitor):
             s = '  node{} -> node{}\n'.format(node._num, child_node._num)
             self.dot_body.append(s)
 
+    def visit_UnaryOp(self, node):
+        s = '  node{} [label="unary {}"]\n'.format(self.ncount, node.op.value)
+        self.dot_body.append(s)
+        node._num = self.ncount
+        self.ncount += 1
+
+        self.visit(node.expr)
+        s = '  node{} -> node{}\n'.format(node._num, node.expr._num)
+        self.dot_body.append(s)
+
     def gendot(self):
         tree = self.parser.parse()
         self.visit(tree)

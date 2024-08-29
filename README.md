@@ -38,3 +38,10 @@ python genastdot.py "7 + 3 * (10 / (12 / (3 + 1) - 1))" > ast.dot && dot -Tpng -
 ![ast.png](ast.png)
 
 执行之前需要先按照dot, 参考：https://graphviz.org/ 
+
+### v8.0 
+support unary operators (+, -)
+```shell
+ python genastdot.py "5---2" > ast.dot && dot -Tpng -o ast_v8.png ast.dot    
+```
+![ast_v8.png](ast_v8.png)
