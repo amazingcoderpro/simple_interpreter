@@ -41,3 +41,13 @@ class Num(AST):
     def __init__(self, token):
          self.token = token
          self.value = token.value
+
+
+class UnaryOp(AST):
+    """
+    一元运算符节点，也是非叶子节点，代表一个一元运算符
+    比如 -2 这个表达式，- 是一元运算符节点，2 是叶子节点
+    """
+    def __init__(self, op, expr):
+        self.token = self.op = op
+        self.expr = expr
