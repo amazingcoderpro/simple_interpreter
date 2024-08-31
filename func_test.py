@@ -7,7 +7,7 @@
 @date: 2024/8/29
 @desc: 
 """
-from sip_token import Token
+from spi_token import Token
 from abs_syntax_tree import Num, BinOp, UnaryOp
 from interpreter import Analyzer, Parser, Interpreter, INTEGER, MINUS
 
@@ -31,7 +31,7 @@ def test_analyzer():
     print(text)
     analyzer = Analyzer(text)
     token = analyzer.get_next_token()
-    while token.type != 'EOF':
+    while token.symbol_type != 'EOF':
         print(token)
         token = analyzer.get_next_token()
 

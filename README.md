@@ -56,3 +56,6 @@ python interpreter.py assignments.txt
 ```shell
 python genastdot.py assignments.txt > ast.dot && dot -Tpng -o ast_v9.png ast.dot  
 ```
+
+### v10.0
+增加符号表记录变量的定义，以处理使用未处理的变量
