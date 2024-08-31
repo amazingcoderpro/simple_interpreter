@@ -59,7 +59,7 @@ class Parser(object):
         # type and if they match then "eat" the current token
         # and assign the next token to the self.current_token,
         # otherwise raise an exception.
-        if self.current_token.type == token_type:
+        if self.current_token.symbol_type == token_type:
             self.current_node.add(TokenNode(self.current_token.value))
             self.current_token = self.lexer.get_next_token()
         else:
@@ -73,9 +73,9 @@ class Parser(object):
         self.current_node = node
 
         token = self.current_token
-        if token.type == INTEGER:
+        if token.symbol_type == INTEGER:
             self.eat(INTEGER)
-        elif token.type == LPAREN:
+        elif token.symbol_type == LPAREN:
             self.eat(LPAREN)
             self.expr()
             self.eat(RPAREN)
@@ -91,11 +91,11 @@ class Parser(object):
 
         self.factor()
 
-        while self.current_token.type in (MUL, DIV):
+        while self.current_token.symbol_type in (MUL, DIV):
             token = self.current_token
-            if token.type == MUL:
+            if token.symbol_type == MUL:
                 self.eat(MUL)
-            elif token.type == DIV:
+            elif token.symbol_type == DIV:
                 self.eat(DIV)
 
             self.factor()
@@ -119,11 +119,11 @@ class Parser(object):
 
         self.term()
 
-        while self.current_token.type in (PLUS, MINUS):
+        while self.current_token.symbol_type in (PLUS, MINUS):
             token = self.current_token
-            if token.type == PLUS:
+            if token.symbol_type == PLUS:
                 self.eat(PLUS)
-            elif token.type == MINUS:
+            elif token.symbol_type == MINUS:
                 self.eat(MINUS)
 
             self.term()

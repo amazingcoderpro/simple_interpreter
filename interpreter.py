@@ -15,14 +15,16 @@ v6.0 : support to evaluates arithmetic expressions that have different operators
 v7.0 : using ASTs represent the operator-operand model of arithmetic expressions.
 v8.0 : support unary operators (+, -)
 v9.0 : support to handle python assignment statements.
+v10.0 : handle variable not defined error
 """
 
 import keyword
 from abs_syntax_tree import BinOp, Num, UnaryOp, Var, NoOp, Compound, Assign
-from sip_token import Token
+from spi_token import Token
+from spi_symbol import VarSymbol, SymbolTable
 
 
-INTEGER, PLUS, EOF, MINUS, MUL, DIV, LPAREN, RPAREN, ID, ASSIGN, REPL = 'INTEGER', 'PLUS', 'EOF', 'MINUS', 'MUL', 'DIV', 'LPAREN', 'RPAREN', 'ID', 'ASSIGN', 'REPL'
+INTEGER, FLOAT, PLUS, EOF, MINUS, MUL, DIV, LPAREN, RPAREN, ID, ASSIGN, REPL = 'INTEGER', 'FLOAT', 'PLUS', 'EOF', 'MINUS', 'MUL', 'DIV', 'LPAREN', 'RPAREN', 'ID', 'ASSIGN', 'REPL'
 PYTHON_RESERVED_KEYWORDS = {key: Token(key, key) for key in keyword.kwlist}
 
 class Analyzer(object):
@@ -55,13 +57,21 @@ class Analyzer(object):
         else:
             return self.text[peek_pos]
 
-    def integer(self):
+    def number(self):
         """return a multi-digit integer"""
         result = ''
         while self.current_char is not None and self.current_char.isdigit():
             result += self.current_char
             self.advance()
-        return int(result)
+        if self.current_char == '.':
+            result += self.current_char
+            self.advance()
+            while self.current_char is not None and self.current_char.isdigit():
+                result += self.current_char
+                self.advance()
+            return float(result)
+        else:
+            return int(result)
 
     def identifier(self):
         """return a multi-digit identifier"""
@@ -81,7 +91,8 @@ class Analyzer(object):
                 self.skip_whitespace()
                 continue
             if self.current_char.isdigit():
-                return Token(INTEGER, self.integer())
+                number = self.number()
+                return Token(INTEGER, number) if isinstance(number, int) else Token(FLOAT, number)
             if self.current_char == '+':
                 self.advance()
                 return Token(PLUS, '+')
@@ -228,6 +239,9 @@ class Parser(object):
         elif self.current_token.type == INTEGER:
             self.eat(INTEGER)
             return Num(token)
+        elif self.current_token.type == FLOAT:
+            self.eat(FLOAT)
+            return Num(token)
         elif self.current_token.type == LPAREN:
             self.eat(LPAREN)
             node = self.expr()
@@ -317,12 +331,75 @@ class Interpreter(NodeVisitor):
 
     def interpret(self):
         tree = self.parser.parse()
+        symbol_builder = SymbolTableBuilder()
+        symbol_builder.visit(tree)
         return self.visit(tree)
+
+
+class SymbolTableBuilder(NodeVisitor):
+    def __init__(self):
+        self.symtab = SymbolTable()
+
+    def visit_BinOp(self, node):
+        self.visit(node.left)
+        self.visit(node.right)
+
+    def visit_Num(self, node):
+        pass
+
+    def visit_UnaryOp(self, node):
+        self.visit(node.expr)
+
+    def visit_Compound(self, node):
+        for child in node.children:
+            self.visit(child)
+
+    def visit_NoOp(self, node):
+        pass
+
+    def visit_VarDecl(self, node):
+        type_name = node.type_node.value
+        type_symbol = self.symtab.lookup(type_name)
+        var_name = node.var_node.value
+        var_symbol = VarSymbol(var_name, type_symbol)
+        self.symtab.define(var_symbol)
+
+    def visit_Assign(self, node):
+        # python代码中赋值就是定义，没有声明
+        var_name = node.left.value
+        var_symbol = VarSymbol(var_name, None)
+        self.symtab.define(var_symbol)
+        self.visit(node.right)
+
+    def visit_Var(self, node):
+        var_name = node.value
+        var_symbol = self.symtab.lookup(var_name)
+        if var_symbol is None:
+            raise NameError(repr(var_name))
+
+    def visit(self, node):
+        if isinstance(node, BinOp):
+            return self.visit_BinOp(node)
+        elif isinstance(node, Num):
+            return self.visit_Num(node)
+        elif isinstance(node, UnaryOp):
+            return self.visit_UnaryOp(node)
+        elif isinstance(node, Var):
+            return self.visit_Var(node)
+        elif isinstance(node, Assign):
+            return self.visit_Assign(node)
+        elif isinstance(node, Compound):
+            return self.visit_Compound(node)
+        elif isinstance(node, NoOp):
+            return self.visit_NoOp(node)
+
 
 
 def main():
     import sys
-    text = open(sys.argv[1], 'r').read()
+    py_file = sys.argv[1]
+    # py_file = 'assignments.txt'
+    text = open(py_file, 'r').read()
     print(f"begin parse input: {text}")
     lexer = Analyzer(text)
     parser = Parser(lexer)
