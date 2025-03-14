@@ -7,6 +7,8 @@
 @date: 2024/8/29
 @desc: 
 """
+
+
 class Token(object):
     def __init__(self, type, value):
         self.type = type
@@ -19,4 +21,4 @@ class Token(object):
         )
 
     def __repr__(self):
-         return self.__str__()
+        return self.__str__()

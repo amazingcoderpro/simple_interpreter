@@ -8,6 +8,7 @@
 @desc: 增加通用符号类
 """
 
+
 class Symbol(object):
     def __int__(self, name, type=None):
         self.name = name
@@ -16,7 +17,7 @@ class Symbol(object):
 
 class BuiltinTypeSymbol(Symbol):
     def __init__(self, name):
-        super().__int__(self, name)
+        super().__int__(name)
 
     def __str__(self):
         return self.name
@@ -30,7 +31,7 @@ class VarSymbol(Symbol):
         super().__int__(name, type)
 
     def __str__(self):
-        return f'VarSymbol:name={self.name}: type={str(self.symbol_type)}'
+        return f'VarSymbol:name={self.name}: type={self.symbol_type}'
 
     __repr__ = __str__
 
